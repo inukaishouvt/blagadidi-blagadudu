@@ -1,0 +1,5 @@
+streamlit
+pandas
+confluent-kafka
+sqlalchemy
+psycopg2-binary
