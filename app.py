@@ -42,14 +42,29 @@ page = st.sidebar.radio("Navigation", ["Upload & ETL", "Real-Time Monitor"])
 # --- SHARED: Kafka Config ---
 st.sidebar.markdown("---")
 st.sidebar.header("Kafka Configuration")
-default_bootstrap = st.secrets["kafka"]["bootstrap_servers"] if "kafka" in st.secrets else ""
-default_key = st.secrets["kafka"]["sasl_username"] if "kafka" in st.secrets else ""
-default_secret = st.secrets["kafka"]["sasl_password"] if "kafka" in st.secrets else ""
 
-KAFKA_BOOTSTRAP = st.sidebar.text_input("Bootstrap Server", value=default_bootstrap)
-KAFKA_KEY = st.sidebar.text_input("API Key", value=default_key, type="password")
-KAFKA_SECRET = st.sidebar.text_input("API Secret", value=default_secret, type="password")
+# UI Inputs (Empty by default for security)
+KAFKA_BOOTSTRAP_INPUT = st.sidebar.text_input("Bootstrap Server", value="")
+KAFKA_KEY_INPUT = st.sidebar.text_input("API Key", value="", type="password")
+KAFKA_SECRET_INPUT = st.sidebar.text_input("API Secret", value="", type="password")
 TOPIC = "ad_pipeline_status"
+
+# Logic: Use User Input -> Fallback to Secrets
+if KAFKA_BOOTSTRAP_INPUT:
+    KAFKA_BOOTSTRAP = KAFKA_BOOTSTRAP_INPUT
+    KAFKA_KEY = KAFKA_KEY_INPUT
+    KAFKA_SECRET = KAFKA_SECRET_INPUT
+else:
+    # Fallback to secrets (Hidden)
+    if "kafka" in st.secrets:
+        st.sidebar.success("✅ Using credentials from Secrets")
+        KAFKA_BOOTSTRAP = st.secrets["kafka"]["bootstrap_servers"]
+        KAFKA_KEY = st.secrets["kafka"]["sasl_username"]
+        KAFKA_SECRET = st.secrets["kafka"]["sasl_password"]
+    else:
+        KAFKA_BOOTSTRAP = ""
+        KAFKA_KEY = ""
+        KAFKA_SECRET = ""
 
 # --- PAGE 1: UPLOAD & ETL ---
 if page == "Upload & ETL":
