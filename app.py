@@ -12,9 +12,9 @@ st.title("🚀 Real-Time Ad Pipeline Monitor")
 st.sidebar.header("Kafka Configuration")
 
 # Try to load from secrets, otherwise use defaults/empty
-default_bootstrap = st.secrets["kafka"]["bootstrap_servers"] if "kafka" in st.secrets else "pkc-312o0.ap-southeast-1.aws.confluent.cloud:9092"
-default_key = st.secrets["kafka"]["sasl_username"] if "kafka" in st.secrets else "JVOVWGBWWIYV4NQZ"
-default_secret = st.secrets["kafka"]["sasl_password"] if "kafka" in st.secrets else "cfltZfjPdrs2z7kF27dWUljHiZoVQE88DKhdHyAT7Zjhj00iKD60CtErDCrZOsoA"
+default_bootstrap = st.secrets["kafka"]["bootstrap_servers"] if "kafka" in st.secrets else ""
+default_key = st.secrets["kafka"]["sasl_username"] if "kafka" in st.secrets else ""
+default_secret = st.secrets["kafka"]["sasl_password"] if "kafka" in st.secrets else ""
 
 KAFKA_BOOTSTRAP = st.sidebar.text_input("Bootstrap Server", value=default_bootstrap)
 KAFKA_KEY = st.sidebar.text_input("API Key", value=default_key, type="password")
