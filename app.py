@@ -62,7 +62,24 @@ if KAFKA_BOOTSTRAP_INPUT:
 else:
     # Fallback to secrets (Hidden)
     from utils import load_config
+    from utils import load_config
     config = load_config()
+    
+    if not config:
+        st.sidebar.error("❌ No Secrets Found!")
+        st.sidebar.info("Please add your secrets in Streamlit Cloud Settings > Secrets.")
+        st.sidebar.code("""[database]
+user = "postgres"
+password = "..."
+host = "..."
+port = "5432"
+dbname = "postgres"
+
+[kafka]
+bootstrap_servers = "..."
+sasl_username = "..."
+sasl_password = "..."
+""", language="toml")
     
     if "kafka" in config:
         st.sidebar.success("✅ Using credentials from Secrets")
