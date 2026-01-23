@@ -19,7 +19,7 @@ def create_db_connection():
         DB_PORT = db_conf['port']
         DB_NAME = db_conf['dbname']
         
-        DATABASE_URI = f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+        DATABASE_URI = f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}?sslmode=require"
         
         engine = create_engine(DATABASE_URI)
         print("Database connection established successfully.")
