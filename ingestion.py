@@ -4,22 +4,23 @@ import glob
 import pandas as pd
 from sqlalchemy import create_engine, text
 
-# Database Credentials
-config = load_config()
-db_conf = config['database']
-
-DB_USER = db_conf['user']
-DB_PASS = db_conf['password']
-DB_HOST = db_conf['host']
-DB_PORT = db_conf['port']
-DB_NAME = db_conf['dbname']
-
-# Connection String
-DATABASE_URI = f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
-
 def create_db_connection():
     """Establishes a database connection using SQLAlchemy."""
     try:
+        # Load config ONLY when needed
+        config = load_config()
+        if 'database' not in config:
+            raise KeyError("Database configuration not found in secrets!")
+
+        db_conf = config['database']
+        DB_USER = db_conf['user']
+        DB_PASS = db_conf['password']
+        DB_HOST = db_conf['host']
+        DB_PORT = db_conf['port']
+        DB_NAME = db_conf['dbname']
+        
+        DATABASE_URI = f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+        
         engine = create_engine(DATABASE_URI)
         print("Database connection established successfully.")
         return engine
@@ -34,7 +35,6 @@ def ingest_data(data_dir: str):
     engine = create_db_connection()
     
     # Get all CSV files in the data/raw directory
-    # Assuming script is run from project root, and data/raw is relative
     search_path = os.path.join(data_dir, "data", "raw", "*.csv")
     csv_files = glob.glob(search_path)
     
@@ -44,11 +44,7 @@ def ingest_data(data_dir: str):
 
     for file_path in csv_files:
         file_name = os.path.basename(file_path)
-        table_name = file_name.replace(".csv", "").replace("raw_", "").lower() # e.g., raw_meta_ads_hourly -> meta_ads_hourly
-        
-        # Keep 'raw_' prefix for clarity in staging if preferred, or just remove extensions
-        # Requirement says "staging database", often implies "raw_..." tables.
-        # Let's use the full name without extension for the table name to be safe and descriptive.
+        # Table name logic
         table_name = file_name.replace(".csv", "").lower()
 
         print(f"Processing {file_name} -> Table: {table_name}")
@@ -58,7 +54,6 @@ def ingest_data(data_dir: str):
             df = pd.read_csv(file_path)
             
             # Ingest to Postgres
-            # using 'replace' to ensure we can rerun the script. In prod, 'append' might be better.
             df.to_sql(table_name, engine, if_exists='replace', index=False)
             
             print(f"Successfully ingested {len(df)} rows into '{table_name}'.")
@@ -71,6 +66,4 @@ def run_ingestion():
     ingest_data(CURRENT_DIR)
 
 if __name__ == "__main__":
-    # Assuming scripts are running from the root of the download folder or user specifies path
-    # Using current working directory for now as per user context
     run_ingestion()
