@@ -265,5 +265,8 @@ def standardize_data():
     
     print("Standardization Complete!")
 
-if __name__ == "__main__":
+def run_standardization():
     standardize_data()
+
+if __name__ == "__main__":
+    run_standardization()

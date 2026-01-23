@@ -8,6 +8,10 @@ import sys
 from sqlalchemy import create_engine, text
 from confluent_kafka import Consumer, KafkaError
 
+import ingestion
+import standardization
+import etl_modeling
+
 # Page Config
 st.set_page_config(page_title="Ad Pipeline Dashboard", layout="wide", page_icon="🚀")
 
@@ -93,7 +97,7 @@ if page == "Upload & ETL":
             # Preview
             st.markdown("### Preview")
             df_preview = pd.read_csv(save_path)
-            st.dataframe(df_preview.head(), use_container_width=True)
+            st.dataframe(df_preview.head(), width='stretch' if True else 'content') # Updated deprecation
 
     with col2:
         st.subheader("2. Run Processing")
@@ -107,25 +111,27 @@ if page == "Upload & ETL":
             try:
                 # Step 1: Ingestion
                 status_placeholder.info("Running Ingestion...")
-                subprocess.run([sys.executable, "ingestion.py"], check=True)
+                # DIRECT CALL instead of subprocess
+                ingestion.run_ingestion()
                 progress_bar.progress(33)
                 
                 # Step 2: Standardization
                 status_placeholder.info("Running Standardization (Clean & Quarantine)...")
-                subprocess.run([sys.executable, "standardization.py"], check=True)
+                standardization.run_standardization()
                 progress_bar.progress(66)
                 
                 # Step 3: Modeling
                 status_placeholder.info("Running ETL Modeling (Star Schema)...")
-                subprocess.run([sys.executable, "etl_modeling.py"], check=True)
+                etl_modeling.run_etl()
                 progress_bar.progress(100)
                 
                 status_placeholder.success("✅ Database Updated Successfully!")
                 time.sleep(1)
                 status_placeholder.empty()
                 
-            except subprocess.CalledProcessError as e:
+            except Exception as e:
                 status_placeholder.error(f"Pipeline Failed! Error: {e}")
+                print(e) # Log for cloud debugging
 
         st.markdown("---")
 
@@ -168,12 +174,12 @@ if page == "Upload & ETL":
             with c1:
                 st.markdown("**Fact Table** (`fact_ad_performance`)")
                 df_fact = pd.read_sql("SELECT * FROM fact_ad_performance ORDER BY ingested_at DESC LIMIT 5", engine)
-                st.dataframe(df_fact, use_container_width=True)
+                st.dataframe(df_fact, width='stretch')
                 
             with c2:
                 st.markdown("**Dimension** (`dim_platform`)")
                 df_dim = pd.read_sql("SELECT * FROM dim_platform LIMIT 5", engine)
-                st.dataframe(df_dim, use_container_width=True)
+                st.dataframe(df_dim, width='stretch')
                 
             st.success("✅ Connected to Database & Verified Data!")
             
@@ -264,13 +270,15 @@ elif page == "Real-Time Monitor":
                         if not df.empty:
                             placeholder_table.dataframe(
                                 df[['timestamp', 'source_platform', 'status', 'ad_id']], 
-                                use_container_width=True
+                                width='stretch'
                             )
                             
                             chart_data = pd.DataFrame({
                                 'Status': ['Valid', 'Quarantined'],
                                 'Count': [valid_count, quarantine_count]
                             })
+                            # metric cards etc
+                            
                             placeholder_charts.bar_chart(chart_data.set_index('Status'))
                             
                 except Exception as e:

@@ -66,8 +66,11 @@ def ingest_data(data_dir: str):
         except Exception as e:
             print(f"Failed to ingest {file_name}: {e}")
 
+def run_ingestion():
+    CURRENT_DIR = os.getcwd()
+    ingest_data(CURRENT_DIR)
+
 if __name__ == "__main__":
     # Assuming scripts are running from the root of the download folder or user specifies path
     # Using current working directory for now as per user context
-    CURRENT_DIR = os.getcwd()
-    ingest_data(CURRENT_DIR)
+    run_ingestion()
