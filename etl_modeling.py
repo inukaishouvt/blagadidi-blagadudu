@@ -1,3 +1,4 @@
+import force_ipv4
 import pandas as pd
 from sqlalchemy import create_engine, text
 from utils import load_config
@@ -14,6 +15,7 @@ def get_engine():
     DB_HOST = db_conf['host']
     DB_PORT = db_conf['port']
     DB_NAME = db_conf['dbname']
+    
     DATABASE_URI = f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}?sslmode=require"
     return create_engine(DATABASE_URI)
 
@@ -111,6 +113,7 @@ def run_etl():
     
     # --- 6. CREATE FACT_DENORM VIEW ---
     print("Creating View 'fact_denorm'...")
+    drop_view_sql = "DROP VIEW IF EXISTS fact_denorm CASCADE"
     create_view_sql = """
     CREATE OR REPLACE VIEW fact_denorm AS
     SELECT 
@@ -122,6 +125,7 @@ def run_etl():
     LEFT JOIN dim_ad_status ds ON f.status_id = ds.status_id
     """
     with engine.connect() as conn:
+        conn.execute(text(drop_view_sql))
         conn.execute(text(create_view_sql))
         conn.commit()
 
