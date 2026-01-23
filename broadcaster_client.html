@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Pipeline Broadcaster Client</title>
+  <script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+      background-color: #f4f4f9;
+    }
+
+    #events {
+      margin-top: 20px;
+    }
+
+    .event {
+      background: white;
+      padding: 15px;
+      margin-bottom: 10px;
+      border-left: 5px solid #007bff;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      border-radius: 4px;
+    }
+
+    .status-ok {
+      border-left-color: #28a745;
+    }
+
+    .status-error {
+      border-left-color: #dc3545;
+    }
+
+    pre {
+      background: #eee;
+      padding: 10px;
+      border-radius: 4px;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>📡 Live Pipeline Events</h1>
+  <p>Listening for broadcasts from <code>pipeline-updates</code> channel...</p>
+
+  <div id="config-status" style="color: red; font-weight: bold;">
+    ⚠️ Please configure your Pusher Key and Cluster in this file (lines 32-33).
+  </div>
+
+  <div id="events"></div>
+
+  <script>
+    // --- CONFIGURE HERE ---
+    // You can get these from your Pusher Dashboard
+    const PUSHER_KEY = 'd85b88f731d49f2f945d';
+    const PUSHER_CLUSTER = 'ap1';
+    // ----------------------
+
+    if (PUSHER_KEY === 'YOUR_KEY') {
+      document.getElementById('events').innerHTML = '<div class="event status-error">Please update the HTML file with your Pusher Key and Cluster.</div>';
+    } else {
+      document.getElementById('config-status').style.display = 'none';
+
+      // Enable pusher logging - don't include this in production
+      Pusher.logToConsole = true;
+
+      var pusher = new Pusher(PUSHER_KEY, {
+        cluster: PUSHER_CLUSTER
+      });
+
+      var channel = pusher.subscribe('pipeline-updates');
+      channel.bind('new-status', function (data) {
+        const eventsDiv = document.getElementById('events');
+
+        const div = document.createElement('div');
+        div.className = 'event';
+
+        let statusClass = '';
+        if (data.status === 'PROCESSED') statusClass = 'status-ok';
+        else if (data.status === 'ERROR' || data.status === 'QUARANTINED') statusClass = 'status-error';
+
+        if (statusClass) div.classList.add(statusClass);
+
+        const time = data.timestamp || new Date().toISOString();
+
+        div.innerHTML = `
+            <strong>Ad ID:</strong> ${data.ad_id} <br>
+            <strong>Status:</strong> ${data.status} <br>
+            <small>${time}</small>
+            <details>
+                <summary>Full Payload</summary>
+                <pre>${JSON.stringify(data, null, 2)}</pre>
+            </details>
+          `;
+
+        // Prepend to show newest first
+        eventsDiv.insertBefore(div, eventsDiv.firstChild);
+      });
+    }
+  </script>
+</body>
+
+</html>

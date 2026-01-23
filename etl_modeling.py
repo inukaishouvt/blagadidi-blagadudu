@@ -2,11 +2,17 @@ import pandas as pd
 from sqlalchemy import create_engine, text
 
 # Database Credentials (Same as before)
-DB_USER = "postgres"
-DB_PASS = "wCb3Ww51PKCmO2wD"
-DB_HOST = "db.yaknidhvchourohrjqfa.supabase.co"
-DB_PORT = "5432"
-DB_NAME = "postgres"
+from utils import load_config
+
+# Database Credentials
+config = load_config()
+db_conf = config['database']
+
+DB_USER = db_conf['user']
+DB_PASS = db_conf['password']
+DB_HOST = db_conf['host']
+DB_PORT = db_conf['port']
+DB_NAME = db_conf['dbname']
 DATABASE_URI = f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
 def get_engine():
@@ -111,7 +117,7 @@ def run_etl():
     
     # Prepare Fact DataFrame
     fact_cols = ['ad_id', 'platform_id', 'time_id', 'account_id', 'status_id', 
-                 'impressions', 'clicks', 'spend', 'currency', 'pipeline_status']
+                 'impressions', 'clicks', 'spend', 'currency', 'pipeline_status', 'video_views']
     
     fact_df = df[fact_cols].rename(columns={'currency': 'currency_code'})
     
@@ -136,6 +142,7 @@ def run_etl():
         f.clicks,
         f.spend,
         f.currency_code as currency,
+        f.video_views,
         f.pipeline_status
     FROM fact_ad_performance f
     JOIN dim_platform p ON f.platform_id = p.platform_id

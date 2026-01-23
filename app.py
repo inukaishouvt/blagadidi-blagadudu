@@ -5,6 +5,7 @@ import time
 import os
 import subprocess
 import sys
+from sqlalchemy import create_engine, text
 from confluent_kafka import Consumer, KafkaError
 
 # Page Config
@@ -56,11 +57,14 @@ if KAFKA_BOOTSTRAP_INPUT:
     KAFKA_SECRET = KAFKA_SECRET_INPUT
 else:
     # Fallback to secrets (Hidden)
-    if "kafka" in st.secrets:
+    from utils import load_config
+    config = load_config()
+    
+    if "kafka" in config:
         st.sidebar.success("✅ Using credentials from Secrets")
-        KAFKA_BOOTSTRAP = st.secrets["kafka"]["bootstrap_servers"]
-        KAFKA_KEY = st.secrets["kafka"]["sasl_username"]
-        KAFKA_SECRET = st.secrets["kafka"]["sasl_password"]
+        KAFKA_BOOTSTRAP = config["kafka"]["bootstrap_servers"]
+        KAFKA_KEY = config["kafka"]["sasl_username"]
+        KAFKA_SECRET = config["kafka"]["sasl_password"]
     else:
         KAFKA_BOOTSTRAP = ""
         KAFKA_KEY = ""
@@ -92,10 +96,10 @@ if page == "Upload & ETL":
             st.dataframe(df_preview.head(), use_container_width=True)
 
     with col2:
-        st.subheader("2. Run Pipeline")
-        st.markdown("This will trigger the full ELT process:")
-        st.code("Ingestion -> Standardization -> Data Modeling", language="text")
+        st.subheader("2. Run Processing")
         
+        # ELT Pipeline
+        st.markdown("**Step A: ETL Pipeline** (DB Update)")
         if st.button("🚀 Run ELT Pipeline", type="primary"):
             status_placeholder = st.empty()
             progress_bar = st.progress(0)
@@ -116,12 +120,65 @@ if page == "Upload & ETL":
                 subprocess.run([sys.executable, "etl_modeling.py"], check=True)
                 progress_bar.progress(100)
                 
-                status_placeholder.success("✅ Pipeline Executed Successfully! Data is ready for streaming.")
-                st.balloons()
+                status_placeholder.success("✅ Database Updated Successfully!")
+                time.sleep(1)
+                status_placeholder.empty()
                 
             except subprocess.CalledProcessError as e:
-                status_placeholder.error(f"Pipeline Failed! Error in one of the scripts.")
-                st.error(str(e))
+                status_placeholder.error(f"Pipeline Failed! Error: {e}")
+
+        st.markdown("---")
+
+        # Kafka Producer
+        st.markdown("**Step B: Streaming** (Push to Kafka)")
+    # --- 3. Verify Data ---
+    st.markdown("---")
+    st.subheader("3. Verify Data (Database Preview)")
+    st.markdown("Check if the **Star Schema** was populated correctly.")
+
+    if st.button("🔍 Preview Star Schema Tables"):
+        from sqlalchemy import create_engine, text
+        
+        # UI Credentials (or use hardcoded for demo)
+        # Database Credentials from Secrets
+        try:
+            from utils import load_config
+            config = load_config()
+            if "database" in config:
+                db_conf = config['database']
+                DB_USER = db_conf['user']
+                DB_PASS = db_conf['password']
+                DB_HOST = db_conf['host']
+                DB_PORT = db_conf['port']
+                DB_NAME = db_conf['dbname']
+            else:
+                st.error("❌ Database secrets not found in secrets.toml!")
+                st.stop()
+        except Exception as e:
+             st.error(f"Error loading secrets: {e}")
+             st.stop()
+            
+        DATABASE_URI = f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+        
+        try:
+            engine = create_engine(DATABASE_URI)
+            
+            c1, c2 = st.columns(2)
+            
+            with c1:
+                st.markdown("**Fact Table** (`fact_ad_performance`)")
+                df_fact = pd.read_sql("SELECT * FROM fact_ad_performance ORDER BY ingested_at DESC LIMIT 5", engine)
+                st.dataframe(df_fact, use_container_width=True)
+                
+            with c2:
+                st.markdown("**Dimension** (`dim_platform`)")
+                df_dim = pd.read_sql("SELECT * FROM dim_platform LIMIT 5", engine)
+                st.dataframe(df_dim, use_container_width=True)
+                
+            st.success("✅ Connected to Database & Verified Data!")
+            
+        except Exception as e:
+            st.error(f"Database Connection Failed: {e}")
 
 # --- PAGE 2: REAL-TIME MONITOR ---
 elif page == "Real-Time Monitor":

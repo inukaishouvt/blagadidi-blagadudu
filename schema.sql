@@ -52,6 +52,7 @@ CREATE TABLE IF NOT EXISTS fact_ad_performance (
     clicks INT DEFAULT 0,
     spend NUMERIC(18, 6) DEFAULT 0, -- High precision for currency
     currency_code VARCHAR(10) DEFAULT 'USD',
+    video_views INT DEFAULT 0,
     
     -- Metadata
     pipeline_status VARCHAR(50),
@@ -59,5 +60,5 @@ CREATE TABLE IF NOT EXISTS fact_ad_performance (
 );
 
 -- Indexes for performance
-CREATE INDEX idx_fact_time ON fact_ad_performance(time_id);
-CREATE INDEX idx_fact_platform ON fact_ad_performance(platform_id);
+CREATE INDEX IF NOT EXISTS idx_fact_time ON fact_ad_performance(time_id);
+CREATE INDEX IF NOT EXISTS idx_fact_platform ON fact_ad_performance(platform_id);

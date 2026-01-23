@@ -3,23 +3,30 @@ import pandas as pd
 from confluent_kafka import Producer
 from confluent_kafka.admin import AdminClient, NewTopic
 from sqlalchemy import create_engine
+import glob
+
+from utils import load_config
+
+# Load common config
+config = load_config()
 
 # Database Credentials
-DB_USER = "postgres"
-DB_PASS = "wCb3Ww51PKCmO2wD"
-DB_HOST = "db.yaknidhvchourohrjqfa.supabase.co"
-DB_PORT = "5432"
-DB_NAME = "postgres"
+db_conf = config['database']
+DB_USER = db_conf['user']
+DB_PASS = db_conf['password']
+DB_HOST = db_conf['host']
+DB_PORT = db_conf['port']
+DB_NAME = db_conf['dbname']
 DATABASE_URI = f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
 # Kafka Config
-# NOTE: Set these or use a config file. DO NOT commit real keys to GitHub.
+kafka_conf = config['kafka']
 KAFKA_CONF = {
-    'bootstrap.servers': 'pkc-312o0.ap-southeast-1.aws.confluent.cloud:9092',
+    'bootstrap.servers': kafka_conf['bootstrap_servers'],
     'security.protocol': 'SASL_SSL',
     'sasl.mechanisms': 'PLAIN',
-    'sasl.username': 'YOUR_API_KEY_HERE', 
-    'sasl.password': 'YOUR_API_SECRET_HERE'
+    'sasl.username': kafka_conf['sasl_username'], 
+    'sasl.password': kafka_conf['sasl_password']
 }
 
 TOPIC_PIPELINE = 'ad_pipeline_status'
@@ -128,7 +135,8 @@ def produce_data():
             "metrics": {
                 "impressions": record.get("impressions"),
                 "clicks": record.get("clicks"),
-                "spend": record.get("spend")
+                "spend": record.get("spend"),
+                "video_views": record.get("video_views")
             }
         }
         producer.produce(

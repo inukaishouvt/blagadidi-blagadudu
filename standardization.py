@@ -1,60 +1,72 @@
 import pandas as pd
+import os
 from sqlalchemy import create_engine
+from utils import load_config
 
 # Database Credentials
-DB_USER = "postgres"
-DB_PASS = "wCb3Ww51PKCmO2wD"
-DB_HOST = "db.yaknidhvchourohrjqfa.supabase.co"
-DB_PORT = "5432"
-DB_NAME = "postgres"
+config = load_config()
+db_conf = config['database']
+
+DB_USER = db_conf['user']
+DB_PASS = db_conf['password']
+DB_HOST = db_conf['host']
+DB_PORT = db_conf['port']
+DB_NAME = db_conf['dbname']
 DATABASE_URI = f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
 def get_engine():
     return create_engine(DATABASE_URI)
 
-# Column Mappings (Same as before)
+# Column Mappings (Updated)
 COLUMN_MAPPINGS = {
     'meta': {
         'timestamp_col': 'hour_start_local', 'timezone_col': 'account_timezone',
         'impressions': 'impressions', 'clicks': 'clicks_all', 'spend': 'spend',
         'currency': 'currency', 'ad_id': 'meta_ad_id',
-        'ad_lifecycle_status': 'delivery_status', 'pipeline_status': 'pipeline_status'
+        'ad_lifecycle_status': 'delivery_status', 'pipeline_status': 'pipeline_status',
+        'video_views': 'video_view_2s'
     },
     'tiktok': {
         'timestamp_col': 'stat_time_hour', 'timezone_col': 'timezone_offset',
         'impressions': 'impressions', 'clicks': 'clicks', 'spend': 'cost',
         'currency': 'currency_code', 'ad_id': 'ad_id',
-        'ad_lifecycle_status': 'ad_status', 'pipeline_status': 'pipe_state'
+        'ad_lifecycle_status': 'ad_status', 'pipeline_status': 'pipe_state',
+        'video_views': 'views_2s'
     },
     'x': { 
         'timestamp_col': 'hourly_timestamp_utc', 'is_utc': True,
         'impressions': 'impressions', 'clicks': 'clicks', 'spend': 'billed_charge_local_micro',
         'currency': 'currency_code', 'ad_id': 'promoted_tweet_id',
-        'ad_lifecycle_status': 'entity_status', 'pipeline_status': 'pipe_status'
+        'ad_lifecycle_status': 'entity_status', 'pipeline_status': 'pipe_status',
+        'video_views': None # Not available
     },
     'linkedin': {
         'timestamp_col': 'timeRange_start_utc', 'is_utc': True,
         'impressions': 'impressions', 'clicks': 'clicks', 'spend': 'spend_local',
         'currency': 'currency_code', 'ad_id': 'creative',
-        'ad_lifecycle_status': 'lifecycle_status', 'pipeline_status': 'pipeline_status'
+        'ad_lifecycle_status': 'lifecycle_status', 'pipeline_status': 'pipeline_status',
+        'video_views': 'video_views'
     },
     'snapchat': {
         'timestamp_col': 'start_time_utc', 'is_utc': True,
         'impressions': 'impressions', 'clicks': 'swipes', 'spend': 'spend',
         'currency': 'currency_code', 'ad_id': 'ad_id',
-        'ad_lifecycle_status': 'delivery_status', 'pipeline_status': 'pipeline_status'
+        'ad_lifecycle_status': 'delivery_status', 'pipeline_status': 'pipeline_status',
+        'video_views': 'video_views'
     },
     'pinterest': {
         'timestamp_col': 'date', 'timestamp_parts': ['date', 'hour'], 'timezone_col': 'timezone',
         'impressions': 'impressions', 'clicks': 'clicks', 'spend': 'spend',
         'currency': 'currency_code', 'ad_id': 'pin_id',
-        'ad_lifecycle_status': 'ad_state', 'pipeline_status': 'pipeline_status'
+        'ad_lifecycle_status': 'ad_state', 'pipeline_status': 'pipeline_status',
+        'video_views': None # Not available
     },
     'youtube': { 
         'timestamp_col': 'segments_date', 'timestamp_parts': ['segments_date', 'segments_hour'], 'timezone_col': 'account_tz',
         'impressions': 'impressions', 'clicks': 'clicks', 'spend': 'cost_micros', 
         'currency': 'currency_code', 'ad_id': 'ad_id',
-        'ad_lifecycle_status': 'primary_status', 'pipeline_status': 'pipeline_status'
+        'ad_lifecycle_status': 'primary_status', 'pipeline_status': 'pipeline_status',
+        'video_views': 'views'
     }
 }
 
@@ -168,6 +180,12 @@ def standardize_data():
         # Apply normalization to status
         std_df['pipeline_status'] = df[mapping['pipeline_status']].apply(normalize_status)
         std_df['ad_lifecycle_status'] = df[mapping['ad_lifecycle_status']]
+
+        # VIDEO VIEWS Logic
+        if mapping['video_views']:
+            std_df['video_views'] = df[mapping['video_views']].fillna(0).astype(int)
+        else:
+            std_df['video_views'] = 0
         
         unified_frames.append(std_df)
 
@@ -220,7 +238,7 @@ def standardize_data():
     df_merged['currency'] = 'USD' # Final currency
     
     # Select Final Columns
-    final_cols = ['platform', 'ad_id', 'timestamp_utc', 'impressions', 'clicks', 'spend_usd', 'currency', 'pipeline_status', 'ad_lifecycle_status']
+    final_cols = ['platform', 'ad_id', 'timestamp_utc', 'impressions', 'clicks', 'spend_usd', 'currency', 'pipeline_status', 'ad_lifecycle_status', 'video_views']
     
     # Rename spend_usd -> spend for the schema
     df_final = df_merged[final_cols].rename(columns={'spend_usd': 'spend'})
@@ -234,7 +252,6 @@ def standardize_data():
     
     # --- EXPORT TO CSV (Requested by User) ---
     print("Exporting CSVs to data/cleaned/ ...")
-    import os
     os.makedirs('data/cleaned', exist_ok=True)
     df_final.to_csv('data/cleaned/unified_ads.csv', index=False)
     df_quarantine.to_csv('data/cleaned/ads_quarantine.csv', index=False)
