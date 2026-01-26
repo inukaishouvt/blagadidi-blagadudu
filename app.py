@@ -309,8 +309,8 @@ elif page == "Real-Time Monitor":
                         
                 debug_container.text(f"Message Received: {msg.value()[:50]}...") # Show first 50 chars
                         
-                    try:
-                        data = json.loads(msg.value().decode('utf-8'))
+                try:
+                    data = json.loads(msg.value().decode('utf-8'))
                         
                         # Flatten device_type from full_record if available/needed, 
                         # or just rely on what's in the top level if we updated producer (producer puts it in full_record)
