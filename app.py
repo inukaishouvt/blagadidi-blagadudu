@@ -126,9 +126,14 @@ if page == "Upload & ETL":
             progress_bar = st.progress(0)
             
             try:
-                # Step 0: Imports (Lazy import to ensure latest version if modified)
+                # Step 0: Imports (Lazy import + Reload to ensure latest changes)
+                import importlib
                 import run_elt
                 import kafka_producer
+                importlib.reload(run_elt)
+                importlib.reload(kafka_producer)
+                
+                print("--- STARTING PIPELINE FROM STREAMLIT ---")
                 
                 # Step 1: Run Full ELT (SQL-Based)
                 status_placeholder.info("Running SQL-Based ELT Pipeline (Ingest -> Transform -> Model)...")

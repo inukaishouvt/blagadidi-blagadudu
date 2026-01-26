@@ -1,8 +1,9 @@
 -- transformations.sql
 -- Goal: Standardize and Clean data from raw_* tables into unified_ads
 
--- 0. Create Intermediary Tables (if not exist)
-CREATE TABLE IF NOT EXISTS unified_ads (
+-- 0. Create Intermediary Tables (Drop first to ensure schema update)
+DROP TABLE IF EXISTS unified_ads CASCADE;
+CREATE TABLE unified_ads (
     ad_id VARCHAR(255),
     platform VARCHAR(50),
     timestamp_utc TIMESTAMP,
@@ -16,7 +17,8 @@ CREATE TABLE IF NOT EXISTS unified_ads (
     device_type VARCHAR(50)
 );
 
-CREATE TABLE IF NOT EXISTS ads_quarantine (
+DROP TABLE IF EXISTS ads_quarantine CASCADE;
+CREATE TABLE ads_quarantine (
     ad_id VARCHAR(255),
     platform VARCHAR(50),
     timestamp_utc TIMESTAMP,
@@ -24,9 +26,7 @@ CREATE TABLE IF NOT EXISTS ads_quarantine (
     raw_record JSONB
 );
 
--- Clear staging tables
-TRUNCATE TABLE unified_ads;
-TRUNCATE TABLE ads_quarantine;
+-- Tables cleared by Drop/Create above
 
 -- Helper to normalize status
 -- (Doing inline via CASE for performance/simplicity or could be a function)
