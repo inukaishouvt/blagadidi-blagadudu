@@ -126,29 +126,29 @@ if page == "Upload & ETL":
             progress_bar = st.progress(0)
             
             try:
-                # Step 1: Ingestion
-                status_placeholder.info("Running Ingestion...")
-                # DIRECT CALL instead of subprocess
-                ingestion.run_ingestion()
-                progress_bar.progress(33)
+                # Step 0: Imports (Lazy import to ensure latest version if modified)
+                import run_elt
+                import kafka_producer
                 
-                # Step 2: Standardization
-                status_placeholder.info("Running Standardization (Clean & Quarantine)...")
-                standardization.run_standardization()
-                progress_bar.progress(66)
+                # Step 1: Run Full ELT (SQL-Based)
+                status_placeholder.info("Running SQL-Based ELT Pipeline (Ingest -> Transform -> Model)...")
+                # Redirect stdout to capture logs if needed, or just run
+                run_elt.run_elt()
+                progress_bar.progress(50)
+                status_placeholder.success("✅ Database Updated Successfully!")
                 
-                # Step 3: Modeling
-                status_placeholder.info("Running ETL Modeling (Star Schema)...")
-                etl_modeling.run_etl()
+                # Step 2: Trigger Kafka Producer
+                status_placeholder.info("Streaming updates to Kafka...")
+                kafka_producer.produce_data()
                 progress_bar.progress(100)
                 
-                status_placeholder.success("✅ Database Updated Successfully!")
-                time.sleep(1)
+                status_placeholder.success("✅ ELT & Streaming Complete!")
+                time.sleep(2)
                 status_placeholder.empty()
                 
             except Exception as e:
                 status_placeholder.error(f"Pipeline Failed! Error: {e}")
-                print(e) # Log for cloud debugging
+                print(e)
 
         st.markdown("---")
 

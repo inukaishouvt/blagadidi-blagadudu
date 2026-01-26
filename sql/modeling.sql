@@ -64,3 +64,23 @@ JOIN dim_time dt ON u.timestamp_utc = dt.timestamp_utc
 JOIN dim_account da ON da.source_account_id = 'UNKNOWN' -- default linkage
 LEFT JOIN dim_ad_status ds ON u.ad_lifecycle_status = ds.lifecycle_status
 LEFT JOIN dim_device dd ON u.device_type = dd.device_type;
+
+-- 3. Recreate View for Application/Producer
+CREATE OR REPLACE VIEW fact_denorm AS
+SELECT 
+    f.ad_id, 
+    dt.timestamp_utc, 
+    dp.platform_name as platform, 
+    ds.lifecycle_status as ad_lifecycle_status, 
+    dd.device_type,
+    f.impressions, 
+    f.clicks, 
+    f.spend, 
+    f.currency_code as currency, 
+    f.video_views, 
+    f.pipeline_status
+FROM fact_ad_performance f
+JOIN dim_platform dp ON f.platform_id = dp.platform_id
+JOIN dim_time dt ON f.time_id = dt.time_id
+LEFT JOIN dim_ad_status ds ON f.status_id = ds.status_id
+LEFT JOIN dim_device dd ON f.device_id = dd.device_id;
