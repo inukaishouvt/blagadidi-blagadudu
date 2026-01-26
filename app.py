@@ -7,6 +7,7 @@ import subprocess
 import sys
 from sqlalchemy import create_engine, text
 from confluent_kafka import Consumer, KafkaError
+import uuid
 
 import ingestion
 import standardization
@@ -249,6 +250,9 @@ elif page == "Real-Time Monitor":
 
     # Connect to Kafka (Helper)
     def get_consumer(bootstrap, key, secret):
+        if 'consumer_group_id' not in st.session_state:
+            st.session_state.consumer_group_id = f"streamlit-monitor-{uuid.uuid4().hex[:8]}"
+            
         try:
             conf = {
                 'bootstrap.servers': bootstrap,
@@ -256,7 +260,7 @@ elif page == "Real-Time Monitor":
                 'sasl.mechanisms': 'PLAIN',
                 'sasl.username': key,
                 'sasl.password': secret,
-                'group.id': 'streamlit-dashboard-group-v1',
+                'group.id': st.session_state.consumer_group_id, # Unique group for fresh view
                 'auto.offset.reset': 'earliest'
             }
             c = Consumer(conf)
