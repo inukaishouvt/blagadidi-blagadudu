@@ -15,6 +15,7 @@ def get_engine():
     DB_HOST = db_conf['host']
     DB_PORT = db_conf['port']
     DB_NAME = db_conf['dbname']
+
     DATABASE_URI = f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}?sslmode=require"
 
     return create_engine(DATABASE_URI)
@@ -23,17 +24,17 @@ def get_engine():
 COLUMN_MAPPINGS = {
     'meta': {
         'timestamp_col': 'hour_start_local', 'timezone_col': 'account_timezone',
-        'impressions': 'impressions', 'clicks': 'clicks_all', 'spend': 'spend',
+        'impressions': 'impressions', 'clicks': 'clicks_all',        'spend': 'spend',
         'currency': 'currency', 'ad_id': 'meta_ad_id',
         'ad_lifecycle_status': 'delivery_status', 'pipeline_status': 'pipeline_status',
-        'video_views': 'video_view_2s'
+        'video_views': 'video_view_2s', 'device_type': 'device_type'
     },
     'tiktok': {
         'timestamp_col': 'stat_time_hour', 'timezone_col': 'timezone_offset',
         'impressions': 'impressions', 'clicks': 'clicks', 'spend': 'cost',
         'currency': 'currency_code', 'ad_id': 'ad_id',
         'ad_lifecycle_status': 'ad_status', 'pipeline_status': 'pipe_state',
-        'video_views': 'views_2s'
+        'video_views': 'views_2s', 'device_type': 'device_type'
     },
     'x': { 
         'timestamp_col': 'hourly_timestamp_utc', 'is_utc': True,
@@ -68,7 +69,7 @@ COLUMN_MAPPINGS = {
         'impressions': 'impressions', 'clicks': 'clicks', 'spend': 'cost_micros', 
         'currency': 'currency_code', 'ad_id': 'ad_id',
         'ad_lifecycle_status': 'primary_status', 'pipeline_status': 'pipeline_status',
-        'video_views': 'views'
+        'video_views': 'views', 'device_type': 'device_type'
     }
 }
 
@@ -100,12 +101,26 @@ def standardize_data():
     unified_frames = []
     
     for platform in platforms:
-        table_name = f"raw_{platform}_ads_hourly"
+        # Prefer cleaned data if available
+        if platform in ['meta', 'tiktok', 'youtube']:
+            table_name = f"clean_{platform}_ads_hourly"
+        else:
+            table_name = f"raw_{platform}_ads_hourly"
+
         print(f"Reading {table_name}...")
         try:
             df = pd.read_sql_table(table_name, engine)
         except ValueError:
-            continue
+            # Fallback to raw if clean not found (e.g. if ingestion failed or not run)
+            if platform in ['meta', 'tiktok', 'youtube']:
+                 print(f"Warning: {table_name} not found. Trying raw...")
+                 table_name = f"raw_{platform}_ads_hourly"
+                 try:
+                    df = pd.read_sql_table(table_name, engine)
+                 except ValueError:
+                    continue
+            else:
+                continue
             
         mapping = COLUMN_MAPPINGS.get(platform)
         
@@ -165,6 +180,12 @@ def standardize_data():
         std_df['ad_lifecycle_status'] = df[mapping['ad_lifecycle_status']]
         std_df['video_views'] = df[mapping['video_views']].fillna(0).astype(int) if mapping['video_views'] else 0
         
+        # Device Type
+        if 'device_type' in mapping and mapping['device_type'] in df.columns:
+             std_df['device_type'] = df[mapping['device_type']].fillna('unknown').astype(str).str.lower()
+        else:
+             std_df['device_type'] = 'unknown'
+        
         unified_frames.append(std_df)
 
     if not unified_frames:
@@ -194,13 +215,17 @@ def standardize_data():
     df_merged['spend_usd'] = df_merged.apply(convert_to_usd, axis=1)
     df_merged['currency'] = 'USD'
     
-    final_cols = ['platform', 'ad_id', 'timestamp_utc', 'impressions', 'clicks', 'spend_usd', 'currency', 'pipeline_status', 'ad_lifecycle_status', 'video_views']
+    final_cols = ['platform', 'ad_id', 'timestamp_utc', 'impressions', 'clicks', 'spend_usd', 'currency', 'pipeline_status', 'ad_lifecycle_status', 'video_views', 'device_type']
     df_final = df_merged[final_cols].rename(columns={'spend_usd': 'spend'})
     
     # --- Load ---
     print("Writing to DB...")
     df_final.to_sql('unified_ads', engine, if_exists='replace', index=False)
     df_quarantine.to_sql('ads_quarantine', engine, if_exists='replace', index=False)
+    
+    # Also save to CSV for user inspection
+    os.makedirs(os.path.join("data", "cleaned"), exist_ok=True)
+    df_final.to_csv(os.path.join("data", "cleaned", "unified_ads.csv"), index=False)
     
     print("Standardization Complete!")
 
@@ -209,3 +234,4 @@ def run_standardization():
 
 if __name__ == "__main__":
     run_standardization()
+

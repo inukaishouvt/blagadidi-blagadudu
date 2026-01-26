@@ -1,16 +1,16 @@
 
 import toml
 import os
-import streamlit as st
-
 def load_config():
     """
     Loads configuration.
     Priority 1: Streamlit Secrets (for Cloud)
     Priority 2: Local secrets/secrets.toml (for Local Dev)
     """
+    print("DEBUG: Entering load_config...")
     # 1. Try Streamlit Secrets (Cloud)
     try:
+        import streamlit as st
         # Check if secrets are loaded
         if hasattr(st, "secrets"):
             # Debugging: Print keys found (obscuring values)
@@ -22,15 +22,15 @@ def load_config():
                 secrets_dict = dict(st.secrets)
                 # Verify database section exists
                 if 'database' not in secrets_dict:
-                    print("⚠️ 'database' section/key missing in st.secrets!")
+                    print("'database' section/key missing in st.secrets!")
                     # Check if keys are flattened (e.g. user defined 'database.user' instead of [database])
                     # Streamlit handles [section] as nested dicts usually.
                 
                 return secrets_dict
             else:
-                 print("⚠️ st.secrets is empty.")
+                 print("st.secrets is empty.")
     except Exception as e:
-        print(f"⚠️ Error accessing st.secrets: {e}")
+        print(f"Error accessing st.secrets: {e}")
 
     # 2. Try Local File (Local Dev)
     try:
@@ -46,11 +46,14 @@ def load_config():
                 config = toml.load(f)
             return config
         else:
-            print(f"⚠️ Local secrets file not found at: {secrets_path}")
+            print(f"Local secrets file not found at: {secrets_path}")
             
     except Exception as e:
         print(f"Error loading local config: {e}")
 
     # 3. Fallback / Empty
-    print("❌ Critical: No config found in st.secrets or local secrets.toml")
+    print("Critical: No config found in st.secrets or local secrets.toml")
     return {}
+
+
+

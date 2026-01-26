@@ -53,10 +53,11 @@ def run_verification():
     print("\n--- TEST CASE 3: Star Schema Integrity (Sample) ---")
     try:
         query = """
-        SELECT f.ad_id, p.platform_name, t.timestamp_utc, f.spend 
+        SELECT f.ad_id, p.platform_name, t.timestamp_utc, f.spend, dd.device_type
         FROM fact_ad_performance f
         JOIN dim_platform p ON f.platform_id = p.platform_id
         JOIN dim_time t ON f.time_id = t.time_id
+        JOIN dim_device dd ON f.device_id = dd.device_id
         LIMIT 5;
         """
         df = pd.read_sql(query, engine)
@@ -76,6 +77,23 @@ def run_verification():
         print(df)
     except Exception as e:
         print(f"Error: {e}")
+
+    print("\n--- TEST CASE 5: Device Type Standardization ---")
+    try:
+        # Check distinct values
+        df = pd.read_sql("SELECT DISTINCT device_type FROM unified_ads", engine)
+        print("Distinct device_types in unified_ads:", df['device_type'].tolist())
+        
+        expected_values = {'mobile', 'desktop', 'tablet', 'tv', 'unknown'}
+        actual_values = set(df['device_type'].dropna().tolist())
+        
+        if actual_values.issubset(expected_values):
+            print("SUCCESS: device_type values are within expected set.")
+        else:
+            print(f"WARNING: Found unexpected device_type values: {actual_values - expected_values}")
+            
+    except Exception as e:
+        print(f"Error checking device_type: {e}")
 
 if __name__ == "__main__":
     run_verification()

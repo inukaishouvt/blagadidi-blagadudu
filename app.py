@@ -189,8 +189,9 @@ if page == "Upload & ETL":
             c1, c2 = st.columns(2)
             
             with c1:
-                st.markdown("**Fact Table** (`fact_ad_performance`)")
-                df_fact = pd.read_sql("SELECT * FROM fact_ad_performance ORDER BY ingested_at DESC LIMIT 5", engine)
+                st.markdown("**Fact Table View** (`fact_denorm`)")
+                # Use the view to get friendly names + device_type
+                df_fact = pd.read_sql("SELECT ad_id, platform, timestamp_utc, spend, device_type, pipeline_status FROM fact_denorm LIMIT 10", engine)
                 st.dataframe(df_fact, width='stretch')
                 
             with c2:
@@ -202,6 +203,34 @@ if page == "Upload & ETL":
             
         except Exception as e:
             st.error(f"Database Connection Failed: {e}")
+
+    st.markdown("---")
+    st.subheader("4. Analysis: Video Views by Platform & Device")
+    if st.button("📊 Run Aggregation Query"):
+         try:
+            # Re-use config logic if possible or just try-catch separate
+            # (Assuming engine relates to same block or re-init if needed, 
+            #  but streamlit reruns script on interaction so we need to ensure engine is available)
+            #  We'll just re-load config safely
+            from utils import load_config
+            from sqlalchemy import create_engine
+            config = load_config()
+            db_conf = config['database']
+            db_uri = f"postgresql://{db_conf['user']}:{db_conf['password']}@{db_conf['host']}:{db_conf['port']}/{db_conf['dbname']}"
+            engine = create_engine(db_uri)
+
+            query = """
+            SELECT platform, device_type, SUM(video_views) as total_views 
+            FROM fact_denorm 
+            GROUP BY platform, device_type 
+            ORDER BY platform, total_views DESC
+            """
+            df_analysis = pd.read_sql(query, engine)
+            st.dataframe(df_analysis, width='stretch')
+            st.bar_chart(df_analysis, x="platform", y="total_views", color="device_type")
+            
+         except Exception as e:
+            st.error(f"Analysis Failed: {e}")
 
 # --- PAGE 2: REAL-TIME MONITOR ---
 elif page == "Real-Time Monitor":
@@ -262,41 +291,74 @@ elif page == "Real-Time Monitor":
                         st.error(msg.error())
                         break
                         
-                try:
-                    data = json.loads(msg.value().decode('utf-8'))
-                    st.session_state.data.append(data)
-                    
-                    # Stats
-                    status = data.get('status', 'UNKNOWN')
-                    if status in ['QUARANTINED', 'QUAR', 'QRN', 'ERROR']:
-                        quarantine_count += 1
-                    else:
-                        valid_count += 1
-                    total_events += 1
-                    
-                    # Update Metrics
-                    with placeholder_metrics.container():
-                        c1, c2, c3 = st.columns(3)
-                        c1.metric("Total Events", total_events)
-                        c2.metric("✅ Validated", valid_count)
-                        c3.metric("🚨 Quarantined", quarantine_count)
+                    try:
+                        data = json.loads(msg.value().decode('utf-8'))
                         
-                    # Update Table & Charts (Batch update)
-                    if total_events % 5 == 0:
-                        df = pd.DataFrame(st.session_state.data[-20:])
-                        if not df.empty:
-                            placeholder_table.dataframe(
-                                df[['timestamp', 'source_platform', 'status', 'ad_id']], 
-                                width='stretch'
-                            )
+                        # Flatten device_type from full_record if available/needed, 
+                        # or just rely on what's in the top level if we updated producer (producer puts it in full_record)
+                        # Pipeline msg: { ..., "full_record": { ..., "device_type": "mobile" } }
+                        full_rec = data.get("full_record", {})
+                        if isinstance(full_rec, dict):
+                            data['device_type'] = full_rec.get('device_type', 'unknown')
+                            # Extract video views (ensure it's an int)
+                            try:
+                                data['video_views'] = int(full_rec.get('video_views', 0))
+                            except:
+                                data['video_views'] = 0
+                        else:
+                            data['device_type'] = 'unknown'
+                            data['video_views'] = 0
+
+                        st.session_state.data.append(data)
+                        
+                        # Stats
+                        status = data.get('status', 'UNKNOWN')
+                        if status in ['QUARANTINED', 'QUAR', 'QRN', 'ERROR']:
+                            quarantine_count += 1
+                        else:
+                            valid_count += 1
+                        total_events += 1
+                    
+                        # Calculate Percentages
+                        valid_pct = (valid_count / total_events) * 100 if total_events > 0 else 0
+                        quar_pct = (quarantine_count / total_events) * 100 if total_events > 0 else 0
+                        
+                        # Update Metrics
+                        with placeholder_metrics.container():
+                            c1, c2, c3, c4 = st.columns(4)
+                            c1.metric("Total Events", total_events)
+                            c2.metric("✅ Validated", f"{valid_count} ({valid_pct:.1f}%)")
+                            c3.metric("🚨 Quarantined", f"{quarantine_count} ({quar_pct:.1f}%)")
                             
-                            chart_data = pd.DataFrame({
-                                'Status': ['Valid', 'Quarantined'],
-                                'Count': [valid_count, quarantine_count]
-                            })
-                            # metric cards etc
+                            # Total Views Metric
+                            total_views = sum(d.get('video_views', 0) for d in st.session_state.data)
+                            c4.metric("👀 Total Video Views", f"{total_views:,}")
                             
-                            placeholder_charts.bar_chart(chart_data.set_index('Status'))
-                            
-                except Exception as e:
-                    pass
+                        # Update Table & Charts (Batch update)
+                        if total_events % 2 == 0: # More frequent updates
+                            df = pd.DataFrame(st.session_state.data[-20:])
+                            if not df.empty:
+                                placeholder_table.dataframe(
+                                    df[['timestamp', 'source_platform', 'device_type', 'video_views', 'status', 'ad_id']], 
+                                    width='stretch'
+                                )
+                                
+                                # Charts
+                                chart1, chart2 = st.columns(2)
+                                with chart1:
+                                    st.markdown("##### Device Type Breakdown")
+                                    if 'device_type' in df.columns:
+                                        device_counts = df['device_type'].value_counts().reset_index()
+                                        device_counts.columns = ['Device', 'Count']
+                                        st.bar_chart(device_counts.set_index('Device'))
+                                
+                                with chart2:
+                                    st.markdown("##### Video Views by Platform")
+                                    if 'video_views' in df.columns and 'source_platform' in df.columns:
+                                        # Group by platform and sum views
+                                        views_by_plat = df.groupby('source_platform')['video_views'].sum().reset_index()
+                                        views_by_plat.columns = ['Platform', 'Views']
+                                        st.bar_chart(views_by_plat.set_index('Platform'))
+
+                    except Exception as e:
+                        pass

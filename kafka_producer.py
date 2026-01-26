@@ -132,6 +132,7 @@ def produce_data():
             "ad_id": record.get("ad_id"),
             "timestamp": record.get("timestamp_utc"),
             "lifecycle_status": record.get("ad_lifecycle_status"),
+            "device_type": record.get("device_type"),
             "metrics": {
                 "impressions": record.get("impressions"),
                 "clicks": record.get("clicks"),

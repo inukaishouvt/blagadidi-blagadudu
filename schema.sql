@@ -36,7 +36,13 @@ CREATE TABLE IF NOT EXISTS dim_ad_status (
     lifecycle_status VARCHAR(50) UNIQUE
 );
 
--- 5. Fact Table: Hourly Ad Performance
+-- 5. Dimension: Device
+CREATE TABLE IF NOT EXISTS dim_device (
+    device_id SERIAL PRIMARY KEY,
+    device_type VARCHAR(50) UNIQUE NOT NULL
+);
+
+-- 6. Fact Table: Hourly Ad Performance
 CREATE TABLE IF NOT EXISTS fact_ad_performance (
     fact_id BIGSERIAL PRIMARY KEY,
     ad_id VARCHAR(255) NOT NULL, -- Business Key
@@ -46,6 +52,7 @@ CREATE TABLE IF NOT EXISTS fact_ad_performance (
     time_id INT REFERENCES dim_time(time_id),
     account_id INT REFERENCES dim_account(account_id),
     status_id INT REFERENCES dim_ad_status(status_id),
+    device_id INT REFERENCES dim_device(device_id),
     
     -- Metrics
     impressions INT DEFAULT 0,
