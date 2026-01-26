@@ -283,22 +283,31 @@ elif page == "Real-Time Monitor":
         else:
             consumer = get_consumer(KAFKA_BOOTSTRAP, KAFKA_KEY, KAFKA_SECRET)
             st.sidebar.success("🟢 Connected to Kafka")
+            st.write(f"Debug: Subscribed to {TOPIC} with group {st.session_state.consumer_group_id}")
             
             total_events = 0
             valid_count = 0
             quarantine_count = 0
             
+            # Debug container
+            debug_container = st.empty()
+            
             while True:
-                msg = consumer.poll(0.1)
+                msg = consumer.poll(0.5) # Increased poll time slightly
                 
                 if msg is None:
+                    debug_container.text("Polling... No message yet.")
                     continue
+                
                 if msg.error():
                     if msg.error().code() == KafkaError._PARTITION_EOF:
-                        continue
+                         debug_container.text("Reached end of partition.")
+                         continue
                     else:
                         st.error(msg.error())
                         break
+                        
+                debug_container.text(f"Message Received: {msg.value()[:50]}...") # Show first 50 chars
                         
                     try:
                         data = json.loads(msg.value().decode('utf-8'))
